@@ -49,15 +49,18 @@ def add_new_job(cursor, jobdetails):
 
 # Check if new job
 def check_if_job_exists(cursor, jobdetails):
-    ##Add your code here
-    query = "UPDATE"
-    return query_sql(cursor, query)
+    job_id = jobdetails['id']
+    query = f"SELECT * FROM jobs WHERE Job_id = '{job_id}'"
+    cursor.execute(query)
+    return cursor.fetchall()
 
 # Deletes job
 def delete_job(cursor, jobdetails):
-    ##Add your code here
-    query = "UPDATE"
-    return query_sql(cursor, query)
+    job_id = jobdetails['id']
+    query = f"DELETE FROM jobs WHERE Job_id = '{job_id}'"
+    cursor.execute(query)
+    cursor.connection.commit()
+    print(f"Job with ID {job_id} deleted.")
 
 
 # Grab new jobs from a website, Parses JSON code and inserts the data into a list of dictionaries do not need to edit
@@ -81,15 +84,12 @@ def add_or_delete_job(jobpage, cursor):
     # Add your code here to parse the job page
     for jobdetails in jobpage['jobs']:  # EXTRACTS EACH JOB FROM THE JOB LIST. It errored out until I specified jobs. This is because it needs to look at the jobs dictionary from the API. https://careerkarma.com/blog/python-typeerror-int-object-is-not-iterable/
         # Add in your code here to check if the job already exists in the DB
-        check_if_job_exists(cursor, jobdetails)
-        is_job_found = len(
-        cursor.fetchall()) > 0  # https://stackoverflow.com/questions/2511679/python-number-of-rows-affected-by-cursor-executeselect
-        if is_job_found:
-
-        else:
-            # INSERT JOB
-            # Add in your code here to notify the user of a new posting. This code will notify the new user
-
+           existing_jobs = check_if_job_exists(cursor, jobdetails)
+       if existing_jobs:  # Job exists, you can handle update if needed
+            print(f"Job already exists: {jobdetails['title']}")
+        else:  # Job does not exist, add it
+            add_new_job(cursor, jobdetails)
+            print(f"New job added: {jobdetails['title']}")
 
 
 # Setup portion of the program. Take arguments and set up the script
