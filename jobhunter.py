@@ -33,19 +33,10 @@ def query_sql(cursor, query):
 
 
 # Add a new job
-def add_new_job(cursor, jobdetails):
+def add_new_job(cursor, job_details):
+    """Insert a new job into the jobs table."""
     # extract all required columns
-    job_id = jobdetails['id']
-    company_name = jobdetails['company_name']
-    created_at = jobdetails['publication_date'][0:10]  # Only keep the date part (YYYY-MM-DD)
-    url = jobdetails['url']
-    title = jobdetails['title']
-    description = html2text.html2text(jobdetails['description'])  
-     query = '''INSERT INTO jobs (Job_id, company, Created_at, url, Title, Description)
-               VALUES (%s, %s, %s, %s, %s, %s)'''
-     cursor.execute(query, (job_id, company_name, created_at, url, title, description))
-     cursor.connection.commit()
-     print(f"New job added: {title}")
+    cursor.execute("INSERT INTO jobs(job_title, description) VALUES(%s, %s)",job_details)
 
 # Check if new job
 def check_if_job_exists(cursor, jobdetails):
@@ -108,6 +99,5 @@ def main():
                
 # Sleep does a rough cycle count, system is not entirely accurate
 # If you want to test if script works change time.sleep() to 10 seconds and delete your table in MySQL
-if __name__ == '__main__':
-    main()
+if __name__ == '__main__': main()
 
