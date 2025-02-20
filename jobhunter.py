@@ -97,15 +97,15 @@ def add_or_delete_job(jobpage, cursor):
 def main():
     # Important, rest are supporting functions
     # Connect to SQL and get cursor
-    conn = connect_to_sql()
-    cursor = conn.cursor()
-    create_tables(cursor)
+      conn = connect_to_sql()
+      cursor = conn.cursor()
+      create_tables(cursor)
 
-    while (1):  # Infinite Loops. Only way to kill it is to crash or manually crash it. We did this as a background process/passive scraper
-        jobhunt(cursor)
-        time.sleep(21600)  # Sleep for 1h, this is ran every hour because API or web interfaces have request limits. Your reqest will get blocked.
+    while True:  # Infinite Loops. Only way to kill it is to crash or manually crash it. We did this as a background process/passive scraper
+            jobhunt(cursor)  
+         time.sleep(21600)  # Sleep for 1h, this is ran every hour because API or web interfaces have request limits. Your reqest will get blocked.
 
-
+               
 # Sleep does a rough cycle count, system is not entirely accurate
 # If you want to test if script works change time.sleep() to 10 seconds and delete your table in MySQL
 if __name__ == '__main__':
