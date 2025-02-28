@@ -90,10 +90,12 @@ def add_or_delete_job(jobpage, cursor):
         if existing_jobs:
             print(f"Job already exists: {jobdetails['title']}")
         else:
-            job_details = {'title': jobdetails['title'], 'description': jobdetails['description']}
-            add_new_job(cursor, job_details)
-            print(f"New job added: {jobdetails['title']}")
-
+            if 'id' in jobdetails and jobdetails['id'].strip():  # Ensure Job_id is valid
+                job_details = {'id': jobdetails['id'], 'title': jobdetails['title'], 'description': jobdetails['description']}
+                add_new_job(cursor, job_details)
+                print(f"New job added: {jobdetails['title']}")
+            else:
+                print(f"Skipping job due to missing Job_id: {jobdetails}")
 
 def update_job(cursor, jobdetails):
     cursor.execute("""
