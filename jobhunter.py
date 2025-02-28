@@ -3,10 +3,10 @@
 
 import mysql.connector
 import time
-#import json
+import json
 import requests
 #from datetime import date
-#import html2text
+import html2text
 
 
 # Connect to database
@@ -18,19 +18,12 @@ def connect_to_sql():
 
 
 # Create the table structure
-def create_tables(conn, cursor):  # ✅ Pass 'conn' as a parameter
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS jobs (
-            id INT PRIMARY KEY AUTO_INCREMENT,
-            Job_id VARCHAR(50) NOT NULL UNIQUE,
-            company VARCHAR(300),
-            Created_at DATE,
-            url VARCHAR(2000),
-            Title TEXT,
-            Description TEXT
-        );
-    """)
-    conn.commit()   # Ensure changes are saved
+def create_tables(cursor):
+    # Creates table
+    # Must set Title to CHARSET utf8 unicode Source: http://mysql.rjweb.org/doc.php/charcoll.
+    # Python is in latin-1 and error (Incorrect string value: '\xE2\x80\xAFAbi...') will occur if Description is not in unicode format due to the json data
+    cursor.execute('''CREATE TABLE IF NOT EXISTS jobs (id INT PRIMARY KEY auto_increment, Job_id varchar(50) , 
+    company varchar (300), salary varchar(300), Created_at DATE, url varchar(30000), Title LONGBLOB, Description LONGBLOB ); ''')
 
 # Query the database.
 # You should not need to edit anything in this function
@@ -40,39 +33,35 @@ def query_sql(cursor, query):
 
 
 # Add a new job
-def add_new_job(cursor, job_details):
-    """Insert a new job into the jobs table."""
-    if 'title' in job_details and 'description' in job_details:
-        cursor.execute("INSERT INTO jobs(Title, Description) VALUES(%s, %s)",
-                       (job_details['title'], job_details['description']))
-    else:
-        print(f"Job missing required data: {job_details}")
+def add_new_job(cursor, jobdetails):
+    # extract all required columns
+    job_id = jobdetails["id"]
+    company = jobdetails["company_name"]
+    url = jobdetails["url"]
+    title = jobdetails["title"]
+    description = html2text.html2text(jobdetails['description'])
+    date = jobdetails['publication_date'][0:10]
+    query = cursor.execute("INSERT INTO jobs(Job_id, company, url, Title, Description, Created_at) "
+               "VALUES(%s, %s, %s, %s, %s, %s)", (job_id, company, url, title, description, date))
+     # %s is what is needed for Mysqlconnector as SQLite3 uses ? the Mysqlconnector uses %s
+    return query_sql(cursor, query)
 
 # Check if new job
 def check_if_job_exists(cursor, jobdetails):
-    job_id = jobdetails['id']
-    query = f"SELECT * FROM jobs WHERE Job_id = '{job_id}'"
-    cursor.execute(query)
-    return cursor.fetchall()
+    query = "SELECT * FROM jobs WHERE Job_id = \"%s\"" % jobdetails['id']
+    return query_sql(cursor, query)
 
-# Deletes job
+
 def delete_job(cursor, jobdetails):
-    job_id = jobdetails['id']
-    query = f"DELETE FROM jobs WHERE Job_id = '{job_id}'"
-    cursor.execute(query)
-    cursor.connection.commit()
-    print(f"Job with ID {job_id} deleted.")
+    query = "DELETE FROM jobs WHERE Job_id = \"%s\"" % jobdetails['id']
+    return query_sql(cursor, query)
 
 # Grab new jobs from a website, Parses JSON code and inserts the data into a list of dictionaries do not need to edit
 def fetch_new_jobs():
-    try:
-        query = requests.get("https://remotive.io/api/remote-jobs")
-        query.raise_for_status()
-        datas = query.json()
-        return datas.get('jobs', [])  # Return empty list if 'jobs' is missing
-    except requests.RequestException as e:
-        print(f"Request failed: {e}")
-        return []
+    query = requests.get("https://remotive.io/api/remote-jobs")
+    datas = json.loads(query.text)
+
+    return datas
 
 # Main area of the code. Should not need to edit
 def jobhunt(cursor):
@@ -82,34 +71,20 @@ def jobhunt(cursor):
     # print(jobpage)
     add_or_delete_job(jobpage, cursor)
 
-
 def add_or_delete_job(jobpage, cursor):
-    for jobdetails in jobpage:
-        existing_jobs = check_if_job_exists(cursor, jobdetails)
+    for jobdetail in jobpage['jobs']:  # EXTRACTS EACH JOB FROM THE JOB LIST. It errored out until I specified jobs. This is because it needs to look at the jobs dictionary from the API. https://careerkarma.com/blog/python-typeerror-int-object-is-not-iterable/
+        check_if_job_exists(cursor, jobdetail)
+        is_job_found = len(
+        cursor.fetchall()) > 0  # https://stackoverflow.com/questions/2511679/python-number-of-rows-affected-by-cursor-executeselect
 
-        if existing_jobs:
-            print(f"Job already exists: {jobdetails['title']}")
+        if is_job_found:
+            delete_job(cursor, jobdetail)
+            print(f'Existing job already listed in DB {jobdetail}')
+
         else:
-            if 'id' in jobdetails and jobdetails['id'].strip():  # Ensure Job_id is valid
-                job_details = {'id': jobdetails['id'], 'title': jobdetails['title'], 'description': jobdetails['description']}
-                add_new_job(cursor, job_details)
-                print(f"New job added: {jobdetails['title']}")
-            else:
-                print(f"Skipping job due to missing Job_id: {jobdetails}")
-
-def update_job(cursor, jobdetails):
-    cursor.execute("""
-        UPDATE jobs SET Title = %s, Description = %s WHERE Job_id = %s
-    """, (jobdetails['title'], jobdetails['description'], jobdetails['id']))
-    cursor.connection.commit()
-    print(f"Job updated: {jobdetails['title']}")
-    jobdetails = {
-        'id': '12345',
-        'title': 'Software Engineer',
-        'company': 'Tech Corp',
-        'description': 'A software engineering role at Tech Corp',
-        'url': 'https://techcorp.com/jobs/12345'
-    }
+            # INSERT JOB
+            add_new_job(cursor, jobdetail)
+            print(f'New job added to DB {jobdetail}')
 
 # Setup portion of the program. Take arguments and set up the script
 # You should not need to edit anything here.
@@ -119,14 +94,13 @@ def main():
     # Connect to SQL and get cursor
     conn = connect_to_sql()
     cursor = conn.cursor()
-    create_tables(conn,cursor)
+    create_tables(cursor)
 
-
-    while True:  # Infinite Loops. Only way to kill it is to crash or manually crash it. We did this as a background process/passive scraper
+    while(1):  # Infinite Loops. Only way to kill it is to crash or manually crash it. We did this as a background process/passive scraper
         jobhunt(cursor)
         time.sleep(21600)
 
 # Sleep does a rough cycle count, system is not entirely accurate
 # If you want to test if script works change time.sleep() to 10 seconds and delete your table in MySQL
-if __name__ == '__main__': main()
-
+if __name__ == '__main__':
+    main()
